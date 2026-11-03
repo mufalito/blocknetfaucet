@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { color-scheme: light; }
+  ::selection { @apply bg-frost-200 text-frost-900; }
+}
+
+@layer components {
+  /* Pastel-blue design system: airy light surfaces, soft gradients, glass
+   * cards, blue→lilac accents, mint success states, mono-forward labels. */
+
+  .f-shell { @apply mx-auto w-full max-w-3xl px-5; }
+  .f-shell-wide { @apply mx-auto w-full max-w-6xl px-5; }
+
+  /* Backdrop — layered frost/lilac/seaglass glows over a pale blue sky;
+   * fixed so the sky never scrolls away. */
+  .f-bg {
+    background:
+      radial-gradient(52rem 30rem at 85% -10%, rgba(139, 189, 246, 0.38), transparent 60%),
+      radial-gradient(44rem 26rem at -10% 22%, rgba(167, 159, 233, 0.22), transparent 60%),
+      radial-gradient(50rem 32rem at 50% 115%, rgba(95, 203, 170, 0.16), transparent 62%),
+      linear-gradient(180deg, #F7FAFF 0%, #EFF4FC 55%, #F5F8FE 100%);
+    background-attachment: fixed;
+  }
+
+  /* Logo mark — frost square with a soft blue glow */
+  .f-dot { @apply inline-block h-2.5 w-2.5 rounded-[4px] bg-gradient-to-br from-frost-300 via-frost-500 to-lilac-500 shadow-[0_0_10px_rgba(100,159,238,0.8)]; }
+
+  /* Blue→lilac gradient text, for headline accents */
+  .f-grad { @apply bg-clip-text text-transparent; background-image: linear-gradient(92deg, #4580DD 0%, #6C81DE 55%, #8C81DE 100%); }
+
+  .f-klabel { @apply font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-frost-600; }
+
+  .f-input { @apply w-full rounded-xl border border-frost-200 bg-white/80 px-4 py-3.5 font-mono text-base text-ink-800 outline-none transition-all placeholder:text-ink-400 focus:border-frost-400 focus:bg-white focus:shadow-[0_0_0_4px_rgba(139,189,246,0.25)]; }
+
+  /* Primary CTA: blue→lilac gradient with a soft drop glow */
+  .f-btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3.5 font-mono text-sm font-bold uppercase tracking-wide text-white shadow-[0_10px_24px_-10px_rgba(52,102,184,0.65)] transition-[filter,box-shadow,transform] hover:brightness-105 hover:shadow-[0_14px_30px_-10px_rgba(52,102,184,0.8)] active:scale-[0.99]; background-image: linear-gradient(135deg, #649FEE 0%, #4580DD 55%, #7566CC 100%); }
+  .f-btn-sec { @apply inline-flex items-center justify-center rounded-lg border border-frost-200 bg-white/70 px-4 py-2 font-mono text-xs font-medium uppercase tracking-wide text-ink-600 transition-colors hover:border-frost-400 hover:text-frost-700; }
+  .f-btn-danger { @apply inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-1.5 font-mono text-[11px] font-medium uppercase tracking-wide text-rose-500 transition-colors hover:border-rose-300 hover:text-rose-600; }
+
+  .f-ok { @apply mb-6 rounded-xl border border-seaglass-200 bg-seaglass-50 px-4 py-3 font-mono text-sm break-all text-seaglass-800; }
+  .f-err { @apply mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 font-mono text-sm break-all text-rose-600; }
+  .f-txid { @apply mt-2 block font-mono text-xs break-all text-seaglass-600; }
+
+  .f-card { @apply rounded-2xl border border-frost-100 bg-white/70 shadow-[0_8px_30px_-18px_rgba(27,46,84,0.28)] backdrop-blur-sm; }
+
+  .f-th { @apply whitespace-nowrap border-b border-frost-100 px-3 py-2.5 text-left font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-frost-500; }
+  .f-td { @apply border-b border-frost-100/70 px-3 py-2.5 text-sm text-ink-600; }
+  .f-copy { @apply inline-flex shrink-0 items-center rounded-md border border-frost-200 bg-white/70 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-500 transition-colors hover:border-frost-400 hover:text-frost-700; }
+  .f-badge { @apply inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider; }
+
+  /* Banner zone — image fills the card edge-to-edge at its natural aspect
+   * (proxied via /api/banner-img/{id}); grid rows top-aligned so unequal
+   * aspects don't stretch cards. */
+  .f-banner { @apply block overflow-hidden rounded-xl border border-frost-100 bg-white/60 shadow-[0_6px_20px_-14px_rgba(27,46,84,0.35)] transition-all hover:border-frost-300 hover:shadow-[0_10px_26px_-14px_rgba(27,46,84,0.45)]; }
+  .f-banner img { @apply block w-full; }
+
+  /* Small pastel stat chip (amount per claim, cooldown, …) */
+  .f-chip { @apply inline-flex items-center gap-1.5 rounded-full border border-frost-200 bg-white/70 px-3 py-1 font-mono text-xs text-ink-600; }
+}
