@@ -472,8 +472,8 @@ export default function Admin() {
               </ul>
             ) : (
               <p className="px-5 py-6 text-center font-mono text-sm text-ink-500">
-                No banners — bundled creatives live in <span className="text-ink-500">/static/ads/</span>. Wide (≥3:1) →
-                top strip (≥900 px wide → bottom billboard); tall (&lt;3:4) → sidebar; else → homepage grid.
+                No banners yet. Wide (≥3:1) → top strip (≥900 px wide → bottom billboard);
+                tall (&lt;3:4) → sidebar; else → homepage grid.
               </p>
             )}
             <form
@@ -497,7 +497,7 @@ export default function Admin() {
               />
               <input
                 required
-                placeholder="Image URL (https://… or /static/ads/…)"
+                placeholder="Image URL (https://… or /static/…)"
                 className="f-input py-2.5 text-sm"
                 value={bnImage}
                 onChange={(e) => setBnImage(e.target.value)}

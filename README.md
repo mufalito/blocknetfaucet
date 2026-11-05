@@ -66,9 +66,8 @@ peer address.
 The boot sequence validates `.env` (exits with a clear message on missing
 keys), applies `drizzle/` migrations, and idempotently seeds default settings.
 Banners are **not** seeded — they are purely admin-managed (add via an
-`http(s)://` URL such as imgur, or a `/static/…` path; `static/ads/` keeps the
-bundled creatives as a local library). Deleting a banner in the panel sticks
-across restarts.
+`http(s)://` URL such as imgur, or any `/static/…` path). Deleting a banner in
+the panel sticks across restarts.
 
 ## Environment
 
@@ -132,8 +131,7 @@ admin click.
 
 `banner_slot(w, h)`: unknown dims → grid; aspect ≥ 3 → `bottom` when ≥ 900 px
 wide else `top`; aspect < 0.75 → `sidebar`; else `grid`. An admin-set `slot`
-always wins over the shape-derived one. Bundled creatives live in
-`static/ads/`.
+always wins over the shape-derived one.
 
 ## Ops notes
 
