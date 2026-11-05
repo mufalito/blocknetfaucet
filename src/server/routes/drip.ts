@@ -109,7 +109,7 @@ dripRoute.post("/api/drip", async (c) => {
 
   // 9. Human check — single-use token per claim; verified only after the free
   // checks so blocked ranges never consume one; fail-closed while configured.
-  if (!(await turnstileOk(turnstileToken, ip, env.turnstileSecret))) {
+  if (!(await turnstileOk(turnstileToken, env.turnstileSecret))) {
     return err("Captcha verification failed — reload and try again", 400);
   }
 
