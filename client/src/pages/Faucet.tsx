@@ -23,6 +23,7 @@ export default function Faucet() {
   const [address, setAddress] = useState("");
   const [result, setResult] = useState<DripOutcome | null>(null);
   const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
   const turnstileHost = useRef<HTMLDivElement>(null);
   const turnstileWidget = useRef<string | undefined>(undefined);
 
@@ -84,6 +85,8 @@ export default function Faucet() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     try {
       const r = await api.drip(address, token || undefined);
       setResult(r);
@@ -98,6 +101,7 @@ export default function Faucet() {
         /* widget not ready */
       }
       setToken("");
+      setBusy(false);
     }
   };
 
@@ -156,12 +160,27 @@ export default function Faucet() {
                 autoComplete="off"
                 spellCheck={false}
                 required
-                className="f-input min-w-0"
+                disabled={busy}
+                className="f-input min-w-0 disabled:opacity-60"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
               />
-              <button type="submit" className="f-btn shrink-0">
-                Claim {config?.amountBnt ?? ""} BNT
+              <button
+                type="submit"
+                className="f-btn shrink-0 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:brightness-100"
+                disabled={busy}
+              >
+                {busy ? (
+                  <>
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+                    </svg>
+                    Sending…
+                  </>
+                ) : (
+                  <>Claim {config?.amountBnt ?? ""} BNT</>
+                )}
               </button>
               {config?.turnstileSitekey ? <div ref={turnstileHost} className="min-h-[65px] sm:col-span-2" /> : null}
             </form>
