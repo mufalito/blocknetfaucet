@@ -39,6 +39,30 @@ npm run dev            # API via tsx watch (uses .env PORT) + Vite on :5173
                        # (Vite proxies /api to the API port)
 ```
 
+### Docker (optional)
+
+```sh
+cp .env.example .env   # fill in the keys
+docker compose up -d --build
+```
+
+The image builds the server + client, keeps only production dependencies,
+and runs the compiled app. SQLite lives on the `faucet-data` volume
+(`DB_PATH=/data/faucet.db`), so claims, settings, banners, and referral
+ledger survive rebuilds. Migrations + seeding run automatically at boot; a
+`HEALTHCHECK` pings `/api/config`. Plain Docker without compose:
+
+```sh
+docker build -t bnt-faucet .
+docker volume create faucet-data
+docker run -d --name faucet -p 8097:8097 --env-file .env \
+  -e DB_PATH=/data/faucet.db -v faucet-data:/data bnt-faucet
+```
+
+IP note: behind a reverse proxy, set `IP_HEADER` (e.g. `X-Forwarded-For`) so
+bans/geo/cooldowns see real client IPs; exposed directly, they use the socket
+peer address.
+
 The boot sequence validates `.env` (exits with a clear message on missing
 keys), applies `drizzle/` migrations, and idempotently seeds default settings.
 Banners are **not** seeded — they are purely admin-managed (add via an

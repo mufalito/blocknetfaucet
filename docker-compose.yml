@@ -1,0 +1,16 @@
+services:
+  faucet:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8097:8097"
+    env_file:
+      - .env
+    environment:
+      # keep the SQLite file on the named volume across rebuilds
+      DB_PATH: /data/faucet.db
+    volumes:
+      - faucet-data:/data
+
+volumes:
+  faucet-data:
