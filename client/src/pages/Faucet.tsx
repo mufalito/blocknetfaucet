@@ -152,7 +152,7 @@ export default function Faucet() {
               <input
                 type="text"
                 name="address"
-                placeholder="BNT address…"
+                placeholder="BNT address or $blocknet.id name…"
                 autoComplete="off"
                 spellCheck={false}
                 required

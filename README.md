@@ -93,7 +93,8 @@ All JSON, cookies `HttpOnly; SameSite=Lax`, errors as `{"error": string}`.
 - `GET /api/recent` — last 10 successful claims, newest first
 - `GET /api/banner-img/:id` — banner image (local `/static/…` confined to `static/`, else server-side proxy with media sniffing)
 - `GET /api/ref/:code` — referral landing: stashes a 30-d `faucet_ref` cookie for 10-hex codes
-- `POST /api/drip` `{ address, turnstileToken? }` — the claim pipeline: shape → IP ban → address ban → geo (fail-open, private IPs exempt) → settings sanity → per-address cooldown → per-IP cooldown → 24 h global cap → Turnstile (fail-closed when secret set) → payout. Every gateway-reached payout leaves a `claims` audit row; pre-payout rejections leave none.
+- `POST /api/drip` `{ address, turnstileToken? }` — the claim pipeline: IP ban → name resolution → shape → address ban → geo (fail-open, private IPs exempt) → settings sanity → per-address cooldown → per-IP cooldown → 24 h global cap → Turnstile (fail-closed when secret set) → payout. Every gateway-reached payout leaves a `claims` audit row; pre-payout rejections leave none.
+  `address` may also be a **blocknet.id** name — `$saturn` or a bare `saturn` (any input too short to be an address and matching `[a-z0-9-]`). Names resolve via `blocknet.id/api/v1/resolve` with the envelope's Ed25519 signature verified against the service's well-known signing pubkey (60 s in-memory cache); bans, cooldowns, the payout, and the idempotency key all use the resolved BNT address.
 
 ### Wallet sign-in (hidden while `AUTH_API_KEY` blank)
 - `POST /api/auth/challenge` / `POST /api/auth/verify` `{ nonce, address, signature }` — proxied to the gateway auth API, with local per-IP lockout (5 definite fails / 15 min, shared with admin login)

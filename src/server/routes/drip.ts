@@ -5,6 +5,7 @@ import { db } from "../db/index.js";
 import { bans, claims, refCodes, referrals } from "../db/schema.js";
 import { fmtBnt, parseBntAtomic } from "../lib/bnt.js";
 import { env } from "../config.js";
+import { parseHandleInput, resolveHandle } from "../lib/handles.js";
 import { clientIp } from "../lib/http.js";
 import { geoCountry, isPrivateIp } from "../lib/geo.js";
 import { getSettings } from "../lib/settings.js";
@@ -18,33 +19,51 @@ export const dripRoute = new Hono();
 
 dripRoute.post("/api/drip", async (c) => {
   const body = (await c.req.json().catch(() => null)) as { address?: unknown; turnstileToken?: unknown } | null;
-  const address = typeof body?.address === "string" ? body.address.trim() : "";
+  const rawInput = typeof body?.address === "string" ? body.address.trim() : "";
   const turnstileToken = typeof body?.turnstileToken === "string" ? body.turnstileToken : "";
   const now = nowSec();
   const ip = clientIp(c, env.ipHeader);
   const err = (message: string, status: 400 | 403 | 429 | 451 | 500 | 502) => c.json({ error: message }, status);
 
-  // 1. Shape check only — the gateway core validates addresses authoritatively.
+  // 1. IP ban first — cheap DB check that gates every external call below.
+  if (db.select({ one: sql<number>`1` }).from(bans).where(and(eq(bans.kind, "ip"), eq(bans.value, ip))).get()) {
+    return err("Your IP is banned from the faucet.", 403);
+  }
+
+  // 2. blocknet.id name ("$saturn" or a bare name) -> its registered BNT
+  // address; every later check (shape, bans, cooldowns, payout) keys on the
+  // resolved address, never the name.
+  let address = rawInput;
+  let handle = parseHandleInput(rawInput);
+  if (handle !== null) {
+    const r = await resolveHandle(handle);
+    if (r.kind === "not_found") {
+      return err(`No blocknet.id name '${handle}' — check the spelling or paste a BNT address`, 400);
+    }
+    if (r.kind !== "ok") {
+      return err("blocknet.id is unreachable — paste a BNT address instead", 502);
+    }
+    address = r.address;
+  }
+
+  // 3. Shape check only — the gateway core validates addresses authoritatively.
   if (!(address.length >= 20 && address.length <= 160)) {
     return err("That doesn't look like a BNT address", 400);
   }
   const s = getSettings();
 
-  // 2/3. Bans — no claim row recorded (not payout attempts).
-  if (db.select({ one: sql<number>`1` }).from(bans).where(and(eq(bans.kind, "ip"), eq(bans.value, ip))).get()) {
-    return err("Your IP is banned from the faucet.", 403);
-  }
+  // 4. Address ban — no claim row recorded (not a payout attempt).
   if (db.select({ one: sql<number>`1` }).from(bans).where(and(eq(bans.kind, "address"), eq(bans.value, address))).get()) {
     return err("This address is banned from the faucet.", 403);
   }
 
-  // 4. Geo-block (fail-open: lookup failure -> "XX", never blocked).
+  // 5. Geo-block (fail-open: lookup failure -> "XX", never blocked).
   const blocked = new Set((s["blocked_countries"] ?? "").split(",").filter((x) => x !== ""));
   if (blocked.size > 0 && blocked.has(await geoCountry(ip))) {
     return err("Faucet is not available in your region.", 451);
   }
 
-  // 5. Live settings (admin-editable); validated here, never exit().
+  // 6. Live settings (admin-editable); validated here, never exit().
   const amountAtomic = parseBntAtomic(s["amount_bnt"] ?? "");
   const capAtomic = parseBntAtomic(s["daily_cap_bnt"] ?? "");
   const cooldownS = Number.parseInt(s["cooldown_hours"] ?? "", 10) * 3600;
@@ -52,7 +71,7 @@ dripRoute.post("/api/drip", async (c) => {
     return err("Faucet settings invalid — contact the operator", 500);
   }
 
-  // 6. Per-address cooldown (successful claims only).
+  // 7. Per-address cooldown (successful claims only).
   const last = db
     .select({ last: sql<number | null>`max(created_at)` })
     .from(claims)
@@ -63,7 +82,7 @@ dripRoute.post("/api/drip", async (c) => {
     if (remaining > 0) return err(`Already claimed; try again in ${fmtHm(remaining)}`, 429);
   }
 
-  // 6b. Per-IP cooldown — same farmer, fresh wallet: the cooldown above is
+  // 7b. Per-IP cooldown — same farmer, fresh wallet: the cooldown above is
   // keyed by address, so a generated address would dodge it. Private/local
   // IPs are exempt so NAT offices and local testing keep working.
   if (!isPrivateIp(ip)) {
@@ -78,7 +97,7 @@ dripRoute.post("/api/drip", async (c) => {
     }
   }
 
-  // 7. Global daily cap.
+  // 8. Global daily cap.
   const spentRow = db
     .select({ spent: sql<number>`coalesce(sum(amount_atomic), 0)` })
     .from(claims)
@@ -88,7 +107,7 @@ dripRoute.post("/api/drip", async (c) => {
     return err("Daily faucet budget exhausted, back tomorrow", 429);
   }
 
-  // 8. Human check — single-use token per claim; verified only after the free
+  // 9. Human check — single-use token per claim; verified only after the free
   // checks so blocked ranges never consume one; fail-closed while configured.
   if (!(await turnstileOk(turnstileToken, ip, env.turnstileSecret))) {
     return err("Captcha verification failed — reload and try again", 400);
@@ -98,11 +117,11 @@ dripRoute.post("/api/drip", async (c) => {
     db.insert(claims).values({ address, amountAtomic, txid, error, createdAt: now, ip }).run();
   };
 
-  // 9. Payout via the documented gateway contract.
+  // 10. Payout via the documented gateway contract.
   const idem = dripIdempotencyKey(address, new Date(now * 1000));
   const result = await requestPayout(env, address, s["amount_bnt"] ?? "", idem);
 
-  // 10. Response handling — every attempted payout leaves an audit row.
+  // 11. Response handling — every attempted payout leaves an audit row.
   if (result.kind === "network_error") {
     record(null, "gateway unreachable");
     return err("gateway unreachable", 502);
@@ -121,8 +140,9 @@ dripRoute.post("/api/drip", async (c) => {
       }
     }
     deleteCookie(c, "faucet_ref", { path: "/" });
+    const dest = handle !== null ? `$${handle} (${address})` : address;
     return c.json(
-      { ok: true, message: `Sent ${fmtBnt(amountAtomic)} BNT to ${address}`, txid: result.txid, address },
+      { ok: true, message: `Sent ${fmtBnt(amountAtomic)} BNT to ${dest}`, txid: result.txid, address },
       200,
     );
   }
