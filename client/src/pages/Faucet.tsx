@@ -112,9 +112,14 @@ export default function Faucet() {
       <Header wide>
         <div className="flex items-center gap-4">
           {config?.signinEnabled ? (
-            <Link to="/signin" className="font-mono text-xs uppercase tracking-[0.15em] text-ink-500 transition-colors hover:text-frost-600">
-              Sign in
-            </Link>
+            <>
+              <Link to="/perks" className="font-mono text-xs uppercase tracking-[0.15em] text-ink-500 transition-colors hover:text-frost-600">
+                Perks
+              </Link>
+              <Link to="/signin" className="font-mono text-xs uppercase tracking-[0.15em] text-ink-500 transition-colors hover:text-frost-600">
+                Sign in
+              </Link>
+            </>
           ) : null}
         </div>
       </Header>
