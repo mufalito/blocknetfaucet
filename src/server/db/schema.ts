@@ -100,6 +100,9 @@ export const referralPayouts = sqliteTable(
     referee: text("referee").notNull(),
     paidAt: integer("paid_at").notNull(),
     txid: text("txid").notNull(),
+    /** Per-referee share at pay time; NULL on rows paid before it existed
+     * (displayed at the current reward setting as the closest estimate). */
+    amountAtomic: integer("amount_atomic"),
   },
   (t) => [uniqueIndex("uq_referral_payouts_referee").on(t.referee)],
 );

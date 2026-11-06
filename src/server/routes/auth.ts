@@ -4,8 +4,8 @@ import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { env } from "../config.js";
 import { db } from "../db/index.js";
-import { claims, refCodes, referrals } from "../db/schema.js";
-import { fmtBnt } from "../lib/bnt.js";
+import { claims, refCodes, referralPayouts, referrals } from "../db/schema.js";
+import { fmtBnt, parseBntAtomic } from "../lib/bnt.js";
 import { claimStats, statsQualified } from "../lib/claims.js";
 import { clientIp } from "../lib/http.js";
 import { isLockedOut, recordLoginFail, clearLoginFails } from "../lib/lockout.js";
@@ -138,6 +138,18 @@ authRoutes.get("/api/me/dashboard", (c) => {
   const minClaims = Math.min(Math.max(Number.parseInt(s["referral_min_claims"] ?? "", 10) || 2, 1), 10);
   const minSpanSec = Math.min(Math.max(Number.parseInt(s["referral_min_span_hours"] ?? "", 10) || 48, 1), 2160) * 3600;
   const autoApprove = s["referral_auto_approve"] === "1";
+  const rewardAtomic = parseBntAtomic(s["referral_reward_bnt"] ?? "") ?? 0;
+
+  // Paid-once ledger rows for this referrer. Legacy rows without a stored
+  // share are counted at the current reward — the closest estimate.
+  const payouts = db
+    .select({ referee: referralPayouts.referee, paidAt: referralPayouts.paidAt, txid: referralPayouts.txid, amountAtomic: referralPayouts.amountAtomic })
+    .from(referralPayouts)
+    .where(eq(referralPayouts.referrer, address))
+    .all();
+  const payoutByReferee = new Map(payouts.map((p) => [p.referee, p]));
+  const earnedAtomic = payouts.reduce((sum, p) => sum + (p.amountAtomic ?? rewardAtomic), 0);
+
   const referees = db
     .select({ address: referrals.referee, createdAt: referrals.createdAt, approvedAt: referrals.approvedAt })
     .from(referrals)
@@ -146,10 +158,13 @@ authRoutes.get("/api/me/dashboard", (c) => {
     .all()
     .map((r) => {
       const st = claimStats(r.address);
+      const payout = payoutByReferee.get(r.address);
       return {
         address: r.address,
         when: humanize(Math.max(now - r.createdAt, 0)),
         qualified: autoApprove || r.approvedAt !== null || statsQualified(st, minClaims, minSpanSec, now),
+        paidWhen: payout ? humanize(Math.max(now - payout.paidAt, 0)) : "",
+        txUrl: payout ? `${EXPLORER_TX}${payout.txid}` : "",
       };
     });
 
@@ -162,6 +177,17 @@ authRoutes.get("/api/me/dashboard", (c) => {
       totalBnt: fmtBnt(total?.sum ?? 0),
       next: fmtNext(remaining),
     },
-    referral: code ? { code, refLink: `${origin}/?ref=${code}`, referees, minClaims, minSpanHours: minSpanSec / 3600 } : null,
+    referral: code
+      ? {
+          code,
+          refLink: `${origin}/?ref=${code}`,
+          referees,
+          minClaims,
+          minSpanHours: minSpanSec / 3600,
+          rewardBnt: fmtBnt(rewardAtomic),
+          earnedBnt: fmtBnt(earnedAtomic),
+          paidCount: payouts.length,
+        }
+      : null,
   });
 });

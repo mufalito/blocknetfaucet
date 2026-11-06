@@ -1,0 +1,1 @@
+ALTER TABLE `referral_payouts` ADD `amount_atomic` integer;

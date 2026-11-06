@@ -67,12 +67,14 @@ export interface Dashboard {
   referral: {
     code: string;
     refLink: string;
-    referees: Array<{ address: string; when: string; qualified: boolean }>;
+    referees: Array<{ address: string; when: string; qualified: boolean; paidWhen: string; txUrl: string }>;
     minClaims: number;
     minSpanHours: number;
+    rewardBnt: string;
+    earnedBnt: string;
+    paidCount: number;
   } | null;
 }
-
 export interface DripOk {
   ok: true;
   message: string;

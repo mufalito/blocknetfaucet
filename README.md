@@ -122,14 +122,17 @@ moment it is captured, and per-referee admin Approve/Unapprove stamps
 `referrals.approved_at` to qualify (or re-queue) one referral by hand.
 Thresholds, overrides, and the `referral_reward_bnt` rate (default 0.02) are
 settings, editable live; the UI shows the reward relative to the per-claim
-amount so tuning stays sober. The user dashboard explains the same rules
-(steps + per-referee qualified/pending status) without exposing reward
-amounts or payment timing.
+amount so tuning stays sober. The user dashboard shows the same rules plus
+the earnings hook: a referral-earnings banner (total paid out per the
+`referral_payouts` ledger's stored per-referee share; legacy rows without
+one count at the current reward) and per-referee `paid · when` badges
+linking to the payout transaction.
 
 "Pay N · X BNT" sends **one** gateway payout (memo `referral reward`) for a
 referrer's qualified & unpaid referees and records them in the
 `referral_payouts` ledger (unique per referee — every referral is payable
-exactly once, ever). The payout idempotency key hashes the referee set, so a
+exactly once, ever — storing each referee's share at pay time). The payout
+idempotency key hashes the referee set, so a
 retry after a lost gateway response replays safely instead of double-sending,
 while a changed set pays fresh. Nothing is automatic; every payout follows an
 admin click.

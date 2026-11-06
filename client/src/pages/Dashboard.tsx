@@ -118,6 +118,23 @@ export default function Dashboard() {
             <h2 className="f-klabel border-b border-frost-100 px-5 py-4">
               Referrals · {data.referral.referees.length}
             </h2>
+            {data.referral.paidCount > 0 ? (
+              <div className="border-b border-frost-100 bg-gradient-to-r from-frost-50 via-white to-lilac-50/80 px-5 py-6">
+                <p className="f-klabel">Referral rewards earned</p>
+                <p className="mt-2 font-mono text-4xl font-semibold tracking-tight">
+                  <span className="f-grad">{data.referral.earnedBnt}</span>
+                  <span className="ml-2 text-lg font-medium text-ink-500">BNT</span>
+                </p>
+                <p className="mt-2 font-mono text-xs text-ink-500">
+                  from {data.referral.paidCount} paid referral{data.referral.paidCount === 1 ? "" : "s"} ·{" "}
+                  {data.referral.rewardBnt} BNT per qualified referral · straight to this wallet
+                </p>
+              </div>
+            ) : (
+              <p className="border-b border-frost-100 px-5 py-3 font-mono text-xs text-ink-500">
+                earn {data.referral.rewardBnt} BNT per qualified referral — paid straight to this wallet
+            </p>
+            )}
             <div className="px-5 py-4">
               <ol className="mb-4 space-y-1.5 text-sm text-ink-500">
                 <li>1 · Share your link</li>
@@ -145,8 +162,18 @@ export default function Dashboard() {
                     <span className="min-w-0 flex-1 truncate text-ink-600" title={r.address}>
                       {truncateMiddle(r.address)}
                     </span>
-                    {r.qualified ? (
-                      <span className="f-badge bg-seaglass-100 text-seaglass-700" title="Counted toward a reward">
+                    {r.paidWhen ? (
+                      <a
+                        href={r.txUrl}
+                        target="_blank"
+                        rel="noopener"
+                        className="f-badge bg-seaglass-100 text-seaglass-700 transition-colors hover:bg-seaglass-200"
+                        title="Reward paid — view the payout transaction"
+                      >
+                        paid · {r.paidWhen} ↗
+                      </a>
+                    ) : r.qualified ? (
+                      <span className="f-badge bg-frost-100 text-frost-700" title="Counted toward a reward">
                         qualified
                       </span>
                     ) : (

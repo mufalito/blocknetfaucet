@@ -335,7 +335,7 @@ adminRoutes.post("/api/admin/referrals/pay", async (c) => {
   const paidAt = nowSec();
   for (const r of due) {
     db.insert(referralPayouts)
-      .values({ referrer, referee: r.address, paidAt, txid: result.txid })
+      .values({ referrer, referee: r.address, paidAt, txid: result.txid, amountAtomic: rewardAtomic })
       .onConflictDoNothing()
       .run();
   }
