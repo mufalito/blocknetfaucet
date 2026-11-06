@@ -190,7 +190,6 @@ adminRoutes.patch("/api/admin/settings", async (c) => {
   return c.json({ ok: true });
 });
 
-
 /** Referral report for the admin panel: every referrer with per-referee
  * qualification (admin approval, auto-approve setting, or >=
  * referral_min_claims successful claims with >= referral_min_span_hours

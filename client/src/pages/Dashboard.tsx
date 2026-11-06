@@ -133,7 +133,7 @@ export default function Dashboard() {
             ) : (
               <p className="border-b border-frost-100 px-5 py-3 font-mono text-xs text-ink-500">
                 earn {data.referral.rewardBnt} BNT per qualified referral — paid straight to this wallet
-            </p>
+              </p>
             )}
             <div className="px-5 py-4">
               <ol className="mb-4 space-y-1.5 text-sm text-ink-500">

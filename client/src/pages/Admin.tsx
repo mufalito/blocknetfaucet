@@ -92,39 +92,31 @@ export default function Admin() {
     if (tab === "referrals") refreshReferrals();
   }, [tab, refreshReferrals]);
 
-  const payBatch = async (referrer: string, count: number, payableBnt: string) => {
+  /** One wrapper for every admin action: ApiError text on failure, ok
+   * message on success (static, or built from the result), then the
+   * matching panel refresh. */
+  const act = async <T,>(
+    fn: () => Promise<T>,
+    okText: string | ((result: T) => string) = "Saved.",
+    after: () => void = refresh,
+  ) => {
+    try {
+      const result = await fn();
+      setMsg({ kind: "ok", text: typeof okText === "function" ? okText(result) : okText });
+      after();
+    } catch (e) {
+      setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
+    }
+  };
+
+  const payBatch = (referrer: string, count: number, payableBnt: string) => {
     if (!window.confirm(`Pay ${count} qualified referral${count === 1 ? "" : "s"} — ${payableBnt} BNT to the referrer?`)) return;
-    try {
-      const res = await api.adminReferralsPay(referrer);
-      setMsg({
-        kind: "ok",
-        text: `Paid ${res.paid} referral${res.paid === 1 ? "" : "s"} (${res.amountBnt} BNT) — txid ${res.txid} (explorer: ${res.explorerUrl})`,
-      });
-      refreshReferrals();
-    } catch (e) {
-      setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
-    }
-  };
-
-  const approveReferee = async (referee: string, undo: boolean) => {
-    try {
-      if (undo) await api.adminReferralUnapprove(referee);
-      else await api.adminReferralApprove(referee);
-      setMsg({ kind: "ok", text: undo ? "Manual approval cleared." : "Referral approved — it now counts toward the reward." });
-      refreshReferrals();
-    } catch (e) {
-      setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
-    }
-  };
-
-  const act = async (fn: () => Promise<unknown>, okText = "Saved.") => {
-    try {
-      await fn();
-      setMsg({ kind: "ok", text: okText });
-      await refresh();
-    } catch (e) {
-      setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
-    }
+    act(
+      () => api.adminReferralsPay(referrer),
+      (res) =>
+        `Paid ${res.paid} referral${res.paid === 1 ? "" : "s"} (${res.amountBnt} BNT) — txid ${res.txid} (explorer: ${res.explorerUrl})`,
+      refreshReferrals,
+    );
   };
 
   const logout = async () => {
@@ -646,11 +638,27 @@ export default function Admin() {
                                     <span className="f-badge bg-frost-100 text-ink-500">pending</span>
                                   )}
                                   {!ref.paid && ref.approved ? (
-                                    <button type="button" className="f-btn-sec" onClick={() => approveReferee(ref.address, true)}>
+                                    <button
+                                      type="button"
+                                      className="f-btn-sec"
+                                      onClick={() =>
+                                        act(() => api.adminReferralUnapprove(ref.address), "Manual approval cleared.", refreshReferrals)
+                                      }
+                                    >
                                       Unapprove
                                     </button>
                                   ) : !ref.paid && !ref.qualified ? (
-                                    <button type="button" className="f-btn-sec" onClick={() => approveReferee(ref.address, false)}>
+                                    <button
+                                      type="button"
+                                      className="f-btn-sec"
+                                      onClick={() =>
+                                        act(
+                                          () => api.adminReferralApprove(ref.address),
+                                          "Referral approved — it now counts toward the reward.",
+                                          refreshReferrals,
+                                        )
+                                      }
+                                    >
                                       Approve
                                     </button>
                                   ) : null}

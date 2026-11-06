@@ -15,7 +15,6 @@ import { mintUserSession, USER_SESSION_TTL, userAddressFor, destroyUserToken } f
 import { fmtNext, humanize, nowSec, sleep } from "../lib/time.js";
 import { EXPLORER_TX } from "../lib/explorer.js";
 
-
 export const authRoutes = new Hono();
 
 /** Fresh single-use challenge from the gateway's auth API. */
