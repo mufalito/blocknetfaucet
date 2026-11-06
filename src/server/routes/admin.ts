@@ -9,7 +9,7 @@ import { banners, bans, claims, referralPayouts, refCodes, referrals, settings }
 import { BANNER_SLOT_LABELS, bannerSlotOf, imageSize, type BannerSlot } from "../lib/banners.js";
 import { fmtBnt, parseBntAtomic } from "../lib/bnt.js";
 import { requestPayout } from "../lib/oalgopay.js";
-import { claimStats } from "../lib/claims.js";
+import { claimStats, statsQualified } from "../lib/claims.js";
 import { clientIp, fetchWithTimeout } from "../lib/http.js";
 import { isLockedOut, recordLoginFail, clearLoginFails } from "../lib/lockout.js";
 import { ADMIN_SESSION_TTL, adminTokenValid, destroyAdminToken, mintAdminToken } from "../lib/sessions.js";
@@ -175,6 +175,11 @@ adminRoutes.patch("/api/admin/settings", async (c) => {
     if (!(n >= 1 && n <= 2160)) return c.json({ error: "Invalid referral qualification, not saved" }, 400);
     updates.push({ key: "referral_min_span_hours", value: String(n) });
   }
+  if (has("referralAutoApprove")) {
+    const v = body?.referralAutoApprove;
+    const on = v === true || v === "true" || v === 1 || v === "1";
+    updates.push({ key: "referral_auto_approve", value: on ? "1" : "0" });
+  }
   if (has("referralRewardBnt")) {
     if (parseBntAtomic(str("referralRewardBnt")) === null) return c.json({ error: "Invalid referral reward, not saved" }, 400);
     updates.push({ key: "referral_reward_bnt", value: str("referralRewardBnt").trim() });
@@ -187,14 +192,17 @@ adminRoutes.patch("/api/admin/settings", async (c) => {
 
 
 /** Referral report for the admin panel: every referrer with per-referee
- * qualification (>= referral_min_claims successful claims spanning
- * >= referral_min_span_hours), paid-once ledger state, and same-IP abuse
- * flags. Also echoes rewardBnt/amountBnt so the UI can show sober math. */
+ * qualification (admin approval, auto-approve setting, or >=
+ * referral_min_claims successful claims with >= referral_min_span_hours
+ * since the referee's FIRST claim), paid-once ledger state, and same-IP
+ * abuse flags. Also echoes rewardBnt/amountBnt so the UI can show sober
+ * math. */
 function referralReport() {
   const s = getSettings();
   const minClaims = Math.min(Math.max(Number.parseInt(s["referral_min_claims"] ?? "", 10) || 2, 1), 10);
   const minSpanHours = Math.min(Math.max(Number.parseInt(s["referral_min_span_hours"] ?? "", 10) || 48, 1), 2160);
   const minSpanSec = minSpanHours * 3600;
+  const autoApprove = s["referral_auto_approve"] === "1";
   const rewardAtomic = parseBntAtomic(s["referral_reward_bnt"] ?? "") ?? 0;
   const now = nowSec();
 
@@ -206,10 +214,10 @@ function referralReport() {
   );
 
   // Group referrals by referrer, preserving first-seen order.
-  const byReferrer = new Map<string, Array<{ referee: string; createdAt: number }>>();
+  const byReferrer = new Map<string, Array<{ referee: string; createdAt: number; approvedAt: number | null }>>();
   for (const r of db.select().from(referrals).orderBy(referrals.createdAt, referrals.id).all()) {
     const list = byReferrer.get(r.referrer) ?? [];
-    list.push({ referee: r.referee, createdAt: r.createdAt });
+    list.push({ referee: r.referee, createdAt: r.createdAt, approvedAt: r.approvedAt ?? null });
     byReferrer.set(r.referrer, list);
   }
 
@@ -219,8 +227,8 @@ function referralReport() {
     const referees = refs.map((r) => {
       const st = claimStats(r.referee);
       st.ips.forEach((ip) => allRefereeIps.add(ip));
-      const span = st.lastAt - st.firstAt;
-      const qualified = st.claims >= minClaims && span >= minSpanSec;
+      const approved = r.approvedAt !== null;
+      const qualified = autoApprove || approved || statsQualified(st, minClaims, minSpanSec, now);
       const paid = paidByReferee.get(r.referee);
       return {
         address: r.referee,
@@ -229,8 +237,10 @@ function referralReport() {
         claims: st.claims,
         firstWhen: st.claims > 0 ? humanize(Math.max(now - st.firstAt, 0)) : "",
         lastWhen: st.claims > 0 ? humanize(Math.max(now - st.lastAt, 0)) : "",
-        spanHours: Math.floor(span / 3600),
+        spanHours: st.claims > 0 ? Math.floor((now - st.firstAt) / 3600) : 0,
         qualified,
+        approved,
+        approvedWhen: approved ? humanize(Math.max(now - (r.approvedAt ?? now), 0)) : "",
         paid: qualified && paid !== undefined,
         paidWhen: paid ? humanize(Math.max(now - paid.paidAt, 0)) : "",
         txid: paid?.txid ?? "",
@@ -256,6 +266,7 @@ function referralReport() {
   return {
     minClaims,
     minSpanHours,
+    autoApprove,
     rewardBnt: s["referral_reward_bnt"] ?? "",
     amountBnt: s["amount_bnt"] ?? "",
     referrers,
@@ -263,6 +274,24 @@ function referralReport() {
 }
 
 adminRoutes.get("/api/admin/referrals", (c) => c.json(referralReport()));
+
+/** Manually qualify one referral (by referee address), regardless of claim
+ * stats — the operator's judgement call on top of the automatic rules. */
+adminRoutes.post("/api/admin/referrals/approve", async (c) => {
+  const body = (await c.req.json().catch(() => null)) as { referee?: unknown } | null;
+  const referee = typeof body?.referee === "string" ? body.referee.trim() : "";
+  const res = db.update(referrals).set({ approvedAt: nowSec() }).where(eq(referrals.referee, referee)).run();
+  if (res.changes === 0) return c.json({ error: "No referral for that referee address" }, 404);
+  return c.json({ ok: true });
+});
+
+/** Clear a manual approval — the stats/auto-approve rules apply again. */
+adminRoutes.delete("/api/admin/referrals/approve/:referee", (c) => {
+  const referee = c.req.param("referee");
+  const res = db.update(referrals).set({ approvedAt: null }).where(eq(referrals.referee, referee)).run();
+  if (res.changes === 0) return c.json({ error: "No referral for that referee address" }, 404);
+  return c.json({ ok: true });
+});
 
 /** Pay every qualified & unpaid referee of one referrer in a single gateway
  * payout. Idempotency key hashes the referee set, so a retry after a lost

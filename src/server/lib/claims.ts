@@ -22,3 +22,16 @@ export function claimStats(address: string): { claims: number; firstAt: number; 
     .filter((ip) => ip !== "");
   return { claims: row?.count ?? 0, firstAt: row?.firstAt ?? 0, lastAt: row?.lastAt ?? 0, ips };
 }
+
+/** Referee qualification by claim stats: at least minClaims successful
+ * claims and at least minSpanSec elapsed since the FIRST one — a
+ * single-claim referee can age into qualifying instead of being stuck at
+ * span 0 forever. (Admin approval / auto-approve bypass this entirely.) */
+export function statsQualified(
+  st: { claims: number; firstAt: number },
+  minClaims: number,
+  minSpanSec: number,
+  now: number,
+): boolean {
+  return st.claims >= minClaims && now - st.firstAt >= minSpanSec;
+}

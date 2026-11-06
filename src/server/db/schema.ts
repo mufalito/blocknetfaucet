@@ -85,6 +85,8 @@ export const referrals = sqliteTable(
     referrer: text("referrer").notNull(),
     referee: text("referee").notNull(),
     createdAt: integer("created_at").notNull(),
+    /** Non-null = admin-approved, qualifies regardless of claim stats. */
+    approvedAt: integer("approved_at"),
   },
   (t) => [uniqueIndex("uq_referrals_referee").on(t.referee)],
 );

@@ -6,7 +6,7 @@ import { env } from "../config.js";
 import { db } from "../db/index.js";
 import { claims, refCodes, referrals } from "../db/schema.js";
 import { fmtBnt } from "../lib/bnt.js";
-import { claimStats } from "../lib/claims.js";
+import { claimStats, statsQualified } from "../lib/claims.js";
 import { clientIp } from "../lib/http.js";
 import { isLockedOut, recordLoginFail, clearLoginFails } from "../lib/lockout.js";
 import { authChallenge, authVerify } from "../lib/oalgopay.js";
@@ -137,19 +137,19 @@ authRoutes.get("/api/me/dashboard", (c) => {
   }
   const minClaims = Math.min(Math.max(Number.parseInt(s["referral_min_claims"] ?? "", 10) || 2, 1), 10);
   const minSpanSec = Math.min(Math.max(Number.parseInt(s["referral_min_span_hours"] ?? "", 10) || 48, 1), 2160) * 3600;
+  const autoApprove = s["referral_auto_approve"] === "1";
   const referees = db
-    .select({ address: referrals.referee, createdAt: referrals.createdAt })
+    .select({ address: referrals.referee, createdAt: referrals.createdAt, approvedAt: referrals.approvedAt })
     .from(referrals)
     .where(eq(referrals.referrer, address))
     .orderBy(desc(referrals.createdAt), desc(referrals.id))
     .all()
     .map((r) => {
       const st = claimStats(r.address);
-      const span = st.lastAt - st.firstAt;
       return {
         address: r.address,
         when: humanize(Math.max(now - r.createdAt, 0)),
-        qualified: st.claims >= minClaims && span >= minSpanSec,
+        qualified: autoApprove || r.approvedAt !== null || statsQualified(st, minClaims, minSpanSec, now),
       };
     });
 

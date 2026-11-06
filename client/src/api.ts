@@ -111,6 +111,8 @@ export interface RefereeReport {
   lastWhen: string;
   spanHours: number;
   qualified: boolean;
+  approved: boolean;
+  approvedWhen: string;
   paid: boolean;
   paidWhen: string;
   txid: string;
@@ -134,6 +136,7 @@ export interface ReferrerReport {
 export interface ReferralsReport {
   minClaims: number;
   minSpanHours: number;
+  autoApprove: boolean;
   rewardBnt: string;
   amountBnt: string;
   referrers: ReferrerReport[];
@@ -155,6 +158,7 @@ export interface SettingsPatch {
   donationAddress?: string;
   referralMinClaims?: string;
   referralMinSpanHours?: string;
+  referralAutoApprove?: boolean;
   referralRewardBnt?: string;
 }
 
@@ -179,6 +183,10 @@ export const api = {
   adminReferrals: () => req<ReferralsReport>("/api/admin/referrals"),
   adminReferralsPay: (referrer: string) =>
     req<ReferralPayResult>("/api/admin/referrals/pay", { method: "POST", body: JSON.stringify({ referrer }) }),
+  adminReferralApprove: (referee: string) =>
+    req<{ ok: boolean }>("/api/admin/referrals/approve", { method: "POST", body: JSON.stringify({ referee }) }),
+  adminReferralUnapprove: (referee: string) =>
+    req<{ ok: boolean }>(`/api/admin/referrals/approve/${encodeURIComponent(referee)}`, { method: "DELETE" }),
   adminSettings: (patch: SettingsPatch) =>
     req<{ ok: boolean }>("/api/admin/settings", { method: "PATCH", body: JSON.stringify(patch) }),
   adminBanAdd: (kind: string, value: string, reason: string) =>

@@ -1,0 +1,1 @@
+ALTER TABLE `referrals` ADD `approved_at` integer;

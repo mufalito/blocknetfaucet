@@ -122,8 +122,8 @@ export default function Dashboard() {
               <ol className="mb-4 space-y-1.5 text-sm text-ink-500">
                 <li>1 · Share your link</li>
                 <li>
-                  2 · Friend claims through it — it counts once they make ≥ {data.referral.minClaims} successful
-                  claims spanning ≥ {data.referral.minSpanHours} h
+                  2 · Friend claims through it — it counts once they make ≥ {data.referral.minClaims} successful claims
+                  with ≥ {data.referral.minSpanHours} h after the first
                 </li>
                 <li>3 · You earn a reward — reviewed and paid by the operator, no fixed schedule</li>
               </ol>
@@ -150,7 +150,7 @@ export default function Dashboard() {
                         qualified
                       </span>
                     ) : (
-                      <span className="f-badge bg-frost-100 text-ink-500" title={`Needs ≥ ${referral?.minClaims} successful claims spanning ≥ ${referral?.minSpanHours} h`}>
+                      <span className="f-badge bg-frost-100 text-ink-500" title={`Needs ≥ ${referral?.minClaims} successful claims with ≥ ${referral?.minSpanHours} h since the first — or an admin approval`}>
                         pending
                       </span>
                     )}

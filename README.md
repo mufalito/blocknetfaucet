@@ -103,22 +103,28 @@ All JSON, cookies `HttpOnly; SameSite=Lax`, errors as `{"error": string}`.
 ### Admin (`faucet_admin` cookie, 24 h)
 - `POST /api/admin/login` / `POST /api/admin/logout` — lockout + constant-time compare
 - `GET /api/admin/overview` — stats, settings, last 50 claims (with IP), bans, banners
-- `PATCH /api/admin/settings` — `amountBnt`, `cooldownHours` (1–720), `dailyCapBnt`, `blockedCountries` (uppercase ISO CSV or `""`), `donationAddress`, `referralMinClaims`, `referralMinSpanHours`, `referralRewardBnt`; per-field validation, live on the next request
+- `PATCH /api/admin/settings` — `amountBnt`, `cooldownHours` (1–720), `dailyCapBnt`, `blockedCountries` (uppercase ISO CSV or `""`), `donationAddress`, `referralMinClaims`, `referralMinSpanHours`, `referralRewardBnt`, `referralAutoApprove` (bool); per-field validation, live on the next request
 - `POST /api/admin/bans` / `DELETE /api/admin/bans/:id`
 - `POST /api/admin/banners` (dims parsed from the image; `/static/…` confined, `http(s)://` fetched), `PATCH /api/admin/banners/:id` `{ slot }`, `POST …/toggle`, `DELETE …/:id`
 - `GET /api/admin/referrals` — per-referrer qualification report (see below)
+- `POST /api/admin/referrals/approve` `{ referee }` — manually qualify one referral; `DELETE /api/admin/referrals/approve/:referee` clears the manual approval
 - `POST /api/admin/referrals/pay` `{ referrer }` — one-click batch reward (see below)
 
 ### Referral program (admin)
 
 Referrals are track-only for users. The admin Referrals tab reports per
 referee qualification — `referral_min_claims` (default 2) successful claims
-spanning at least `referral_min_span_hours` (default 48) — plus same-IP flags
-(a referee whose claims share an IP with the referrer). Thresholds and the
-`referral_reward_bnt` rate (default 0.02) are settings, editable live; the UI
-shows the reward relative to the per-claim amount so tuning stays sober. The
-user dashboard explains the same rules (steps + per-referee qualified/pending
-status) without exposing reward amounts or payment timing.
+with at least `referral_min_span_hours` (default 48) elapsed since the
+referee's **first** claim — plus same-IP flags (a referee whose claims share
+an IP with the referrer). Two overrides sit on top of the stats rule:
+`referral_auto_approve` (setting, default off) qualifies every referral the
+moment it is captured, and per-referee admin Approve/Unapprove stamps
+`referrals.approved_at` to qualify (or re-queue) one referral by hand.
+Thresholds, overrides, and the `referral_reward_bnt` rate (default 0.02) are
+settings, editable live; the UI shows the reward relative to the per-claim
+amount so tuning stays sober. The user dashboard explains the same rules
+(steps + per-referee qualified/pending status) without exposing reward
+amounts or payment timing.
 
 "Pay N · X BNT" sends **one** gateway payout (memo `referral reward`) for a
 referrer's qualified & unpaid referees and records them in the

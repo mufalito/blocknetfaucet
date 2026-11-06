@@ -22,6 +22,7 @@ export function seed(env: Env): void {
       { key: "donation_address", value: "" },
       { key: "referral_min_claims", value: "2" },
       { key: "referral_min_span_hours", value: "48" },
+      { key: "referral_auto_approve", value: "0" },
       { key: "referral_reward_bnt", value: "0.02" },
     ])
     .onConflictDoNothing()

@@ -32,6 +32,7 @@ interface SettingsForm {
   referralMinClaims: string;
   referralMinSpanHours: string;
   referralRewardBnt: string;
+  referralAutoApprove: boolean;
 }
 
 export default function Admin() {
@@ -67,6 +68,7 @@ export default function Admin() {
             referralMinClaims: data.settings["referral_min_claims"] ?? "2",
             referralMinSpanHours: data.settings["referral_min_span_hours"] ?? "48",
             referralRewardBnt: data.settings["referral_reward_bnt"] ?? "0.02",
+            referralAutoApprove: data.settings["referral_auto_approve"] === "1",
           },
         );
       })
@@ -98,6 +100,17 @@ export default function Admin() {
         kind: "ok",
         text: `Paid ${res.paid} referral${res.paid === 1 ? "" : "s"} (${res.amountBnt} BNT) — txid ${res.txid} (explorer: ${res.explorerUrl})`,
       });
+      refreshReferrals();
+    } catch (e) {
+      setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
+    }
+  };
+
+  const approveReferee = async (referee: string, undo: boolean) => {
+    try {
+      if (undo) await api.adminReferralUnapprove(referee);
+      else await api.adminReferralApprove(referee);
+      setMsg({ kind: "ok", text: undo ? "Manual approval cleared." : "Referral approved — it now counts toward the reward." });
       refreshReferrals();
     } catch (e) {
       setMsg({ kind: "err", text: e instanceof ApiError ? e.message : "request failed" });
@@ -300,7 +313,7 @@ export default function Admin() {
                 />
               </label>
               <label className="grid gap-2">
-                <span className="f-klabel">Referral: min span between first/last claim (h)</span>
+                <span className="f-klabel">Referral: min hours since the referee's first claim</span>
                 <input
                   required
                   className="f-input"
@@ -317,6 +330,20 @@ export default function Admin() {
                   onChange={(e) => setForm({ ...form, referralRewardBnt: e.target.value })}
                 />
                 <span className="font-mono text-xs text-ink-500">{rewardContext(form.referralRewardBnt, form.amountBnt) || "enter a positive amount"}</span>
+              </label>
+              <label className="flex items-center gap-3 rounded-xl border border-frost-200 bg-white/60 px-4 py-3">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-frost-600"
+                  checked={form.referralAutoApprove}
+                  onChange={(e) => setForm({ ...form, referralAutoApprove: e.target.checked })}
+                />
+                <span>
+                  <span className="f-klabel block">Auto-approve referrals</span>
+                  <span className="block font-mono text-xs text-ink-500">
+                    every referral qualifies immediately — claims/span checks are skipped, payouts stay manual
+                  </span>
+                </span>
               </label>
               <div className="sm:col-span-2">
                 <button type="submit" className="f-btn">
@@ -531,8 +558,9 @@ export default function Admin() {
         ) : tab === "referrals" ? (
           <section className="f-card">
             <h2 className="f-klabel border-b border-frost-100 px-5 py-4">
-              Referral program · qualified = ≥ {refReport?.minClaims ?? "?"} successful claims spanning ≥{" "}
-              {refReport?.minSpanHours ?? "?"} h · reward {refReport?.rewardBnt ?? "?"} BNT (tune in Settings)
+              Referral program · qualified = admin approval{refReport?.autoApprove ? " (AUTO ON)" : ""} or ≥{" "}
+              {refReport?.minClaims ?? "?"} successful claims ≥ {refReport?.minSpanHours ?? "?"} h after the first ·
+              reward {refReport?.rewardBnt ?? "?"} BNT (tune in Settings)
             </h2>
             {refReport ? (
               <p className="border-b border-frost-100 px-5 py-2 font-mono text-xs text-ink-500">
@@ -580,7 +608,7 @@ export default function Admin() {
                             <th className="f-th">Referee</th>
                             <th className="f-th">Referred</th>
                             <th className="f-th">Claims</th>
-                            <th className="f-th">Span</th>
+                            <th className="f-th">Since 1st claim</th>
                             <th className="f-th">Last claim</th>
                             <th className="f-th">IPs</th>
                             <th className="f-th"></th>
@@ -594,7 +622,7 @@ export default function Admin() {
                               </td>
                               <td className="f-td whitespace-nowrap font-mono text-xs text-ink-500">{ref.referredWhen}</td>
                               <td className="f-td whitespace-nowrap font-mono text-xs text-ink-600">{ref.claims}</td>
-                              <td className="f-td whitespace-nowrap font-mono text-xs text-ink-500">{ref.claims > 1 ? `${ref.spanHours} h` : "—"}</td>
+                              <td className="f-td whitespace-nowrap font-mono text-xs text-ink-500">{ref.claims > 0 ? `${ref.spanHours} h` : "—"}</td>
                               <td className="f-td whitespace-nowrap font-mono text-xs text-ink-500">{ref.lastWhen || "—"}</td>
                               <td className="f-td whitespace-nowrap font-mono text-xs text-ink-500">
                                 {ref.ips.join(", ") || "—"}
@@ -603,15 +631,30 @@ export default function Admin() {
                                 ) : null}
                               </td>
                               <td className="f-td">
-                                {ref.paid ? (
-                                  <span className="f-badge bg-seaglass-100 text-seaglass-700" title={ref.txid}>
-                                    paid {ref.paidWhen}
-                                  </span>
-                                ) : ref.qualified ? (
-                                  <span className="f-badge bg-frost-100 text-frost-700">qualified · unpaid</span>
-                                ) : (
-                                  <span className="f-badge bg-frost-100 text-ink-500">pending</span>
-                                )}
+                                <div className="flex items-center gap-1.5">
+                                  {ref.paid ? (
+                                    <span className="f-badge bg-seaglass-100 text-seaglass-700" title={ref.txid}>
+                                      paid {ref.paidWhen}
+                                    </span>
+                                  ) : ref.approved ? (
+                                    <span className="f-badge bg-lilac-100 text-lilac-700" title={`Approved by admin ${ref.approvedWhen} ago`}>
+                                      approved
+                                    </span>
+                                  ) : ref.qualified ? (
+                                    <span className="f-badge bg-frost-100 text-frost-700">qualified · unpaid</span>
+                                  ) : (
+                                    <span className="f-badge bg-frost-100 text-ink-500">pending</span>
+                                  )}
+                                  {!ref.paid && ref.approved ? (
+                                    <button type="button" className="f-btn-sec" onClick={() => approveReferee(ref.address, true)}>
+                                      Unapprove
+                                    </button>
+                                  ) : !ref.paid && !ref.qualified ? (
+                                    <button type="button" className="f-btn-sec" onClick={() => approveReferee(ref.address, false)}>
+                                      Approve
+                                    </button>
+                                  ) : null}
+                                </div>
                               </td>
                             </tr>
                           ))}
